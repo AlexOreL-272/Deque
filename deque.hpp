@@ -202,10 +202,8 @@ class Deque {
         }
         delete_to_pos = 0;
       }
-
       begin_vector_ = &outer_[num_of_arrays_above_];
       begin_pos_ = other.begin_pos_;
-
       if (num_of_arrays_beyond_ + 1 - uses_whole_number != 0) {
         outer_[size - num_of_arrays_beyond_ - 1 + uses_whole_number] =
             alloc_traits::allocate(alloc_, kInnerArraySize);
@@ -216,7 +214,6 @@ class Deque {
       }
 
       end_pos_ = other.end_pos_;
-
       if (*other.end_vector_ != nullptr) {
         ++delete_to_vec;
         for (size_t i = begin_vector_ == end_vector_ ? begin_pos_ : 0;
@@ -248,7 +245,7 @@ class Deque {
   }
 
   Deque(std::initializer_list<T> init, const Alloc& alloc = Alloc())
-      : actual_size_(init.size()) {
+      : actual_size_(init.size()), alloc_(alloc) {
     size_t num_of_arrays;
     size_t delete_to_vec;
     size_t delete_to_pos = 0;
@@ -425,8 +422,6 @@ class Deque {
       return;
     }
 
-    // print();
-
     std::vector<T*> new_vec(cur_size * 3, nullptr);
     for (size_t i = cur_size - 1; i < 2 * cur_size - 1; ++i) {
       new_vec[i] = outer_[i - cur_size + 1];
@@ -441,8 +436,6 @@ class Deque {
 
     begin_vector_ = &outer_[cur_size - 1] + (begin_vector_ - addr);
     end_vector_ = &outer_[cur_size - 1] + (end_vector_ - addr);
-
-    // print();
   }
 
   void push_back(const T& elem) {
@@ -450,7 +443,6 @@ class Deque {
 
     if (nullptr == *end_vector_) {
       *end_vector_ = alloc_traits::allocate(alloc_, kInnerArraySize);
-      return;
     }
 
     try {
@@ -515,6 +507,7 @@ class Deque {
       end_pos_ = kInnerArraySize - 1;
       end_vector_--;
       num_of_arrays_beyond_++;
+      alloc_traits::deallocate(alloc_, *end_vector_, kInnerArraySize);
     } else {
       alloc_traits::destroy(alloc_, *end_vector_ + end_pos_ - 1);
       end_pos_--;
@@ -534,6 +527,7 @@ class Deque {
     if (begin_pos_ == kInnerArraySize) {
       begin_pos_ = 0;
       begin_vector_++;
+      alloc_traits::deallocate(alloc_, *begin_vector_, kInnerArraySize);
       num_of_arrays_above_++;
     }
 
@@ -545,7 +539,6 @@ class Deque {
 
     if (nullptr == *end_vector_) {
       *end_vector_ = alloc_traits::allocate(alloc_, kInnerArraySize);
-      return;
     }
 
     try {
@@ -713,7 +706,7 @@ class Deque {
   }
 
   void insert(iterator iter, const T& val) {
-    // Deque copy(*this);
+    Deque copy(*this);
 
     try {
       auto end_iter = end();
@@ -733,7 +726,7 @@ class Deque {
       push_back(tmp1);
     } catch (...) {
       std::cout << "---------- Error! -------------\n";
-      // *this = copy;
+      *this = copy;
       throw -3;  // std::runtime_error("Could not insert a value\n");
     }
   }
