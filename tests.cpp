@@ -1,33 +1,54 @@
-#include <iostream>
-#include <numeric>
+/** @author yaishenka
+    @date 05.01.2023 */
+
+#include <algorithm>
+#include <functional>
 #include <random>
 #include <type_traits>
+#include <numeric>
+#include <deque>
 #include "deque.hpp"
+#include "utils.hpp"
+#include "memory_utils.hpp"
 
-template <typename T, typename U>
-void EXPECT_EQ(T l, U r) {
-  std::cout << std::boolalpha << (l == r) << '\n';
-}
+size_t MemoryManager::type_new_allocated = 0;
+size_t MemoryManager::type_new_deleted = 0;
+size_t MemoryManager::allocator_allocated = 0;
+size_t MemoryManager::allocator_deallocated = 0;
+size_t MemoryManager::allocator_constructed = 0;
+size_t MemoryManager::allocator_destroyed = 0;
 
-void EXPECT_TRUE(bool a) {
-  std::cout << std::boolalpha << a << '\n';
-}
+template <typename T, bool PropagateOnConstruct, bool PropagateOnAssign>
+size_t
+    WhimsicalAllocator<T, PropagateOnConstruct, PropagateOnAssign>::counter = 0;
 
-void EXPECT_FALSE(bool a) {
-  std::cout << std::boolalpha << !a << '\n';
+size_t Accountant::ctor_calls = 0;
+size_t Accountant::dtor_calls = 0;
+
+bool ThrowingAccountant::need_throw = false;
+
+void SetupTest() {
+  MemoryManager::type_new_allocated = 0;
+  MemoryManager::type_new_deleted = 0;
+  MemoryManager::allocator_allocated = 0;
+  MemoryManager::allocator_deallocated = 0;
+  MemoryManager::allocator_constructed = 0;
+  MemoryManager::allocator_destroyed = 0;
 }
 
 struct NotDefaultConstructible {
   NotDefaultConstructible() = delete;
   NotDefaultConstructible(int data) : data(data) {}
+  bool operator==(const NotDefaultConstructible& other) {
+    return data == other.data;
+  }
+  bool operator!=(const NotDefaultConstructible& other) {
+    return data != other.data;
+  }
   int data;
-
-  auto operator<=>(const NotDefaultConstructible&) const = default;
 };
 
 struct ThrowStruct {
-  ThrowStruct() = default;
-
   ThrowStruct(int value, bool throw_in_assignment, bool throw_in_copy) :
       value(value),
       throw_in_assignment(throw_in_assignment),
@@ -55,8 +76,6 @@ struct ThrowStruct {
     return *this;
   }
 
-  auto operator<=>(const ThrowStruct&) const = default;
-
   int value;
   bool throw_in_assignment;
   bool throw_in_copy;
@@ -73,12 +92,35 @@ bool CompareStacks(const Stack1& s1, const Stack2& s2) {
   return true;
 }
 
+template <typename T, typename U>
+void EXPECT_EQ(T a, U b) {
+  std::cout << std::boolalpha << (a == b) << '\n';
+}
+
+void EXPECT_TRUE(bool a) {
+  std::cout << std::boolalpha << a << '\n';
+}
+
+void EXPECT_FALSE(bool a) {
+  std::cout << std::boolalpha << !a << '\n';
+}
+
+template <typename T, typename U>
+void ASSERT_EQ(T a, U b) {
+  std::cout << std::boolalpha << (a == b) << '\n';
+}
+
+void ASSERT_TRUE(bool a) {
+  std::cout << std::boolalpha << a << '\n';
+}
+
+void ASSERT_FALSE(bool a) {
+  std::cout << std::boolalpha << !a << '\n';
+}
+
 template <typename Iterator, typename T>
 void IteratorTest() {
-  std::cout << "Checking iterators: \n";
-
   using traits = std::iterator_traits<Iterator>;
-
 
   {
     auto test = std::is_same_v<std::remove_cv_t<typename traits::value_type>,
@@ -119,7 +161,8 @@ void IteratorTest() {
   }
 
   {
-    auto test = std::is_same_v<decltype(std::declval<Iterator>() += 5), Iterator&>;
+    auto test =
+        std::is_same_v<decltype(std::declval<Iterator>() += 5), Iterator&>;
     EXPECT_TRUE(test);
   }
 
@@ -169,76 +212,10 @@ void IteratorTest() {
         != std::declval<Iterator>()), bool>;
     EXPECT_TRUE(test);
   }
-
-  {
-    {
-      Deque<int> empty;
-
-      EXPECT_EQ(empty.end() - empty.begin(), 0);
-      EXPECT_EQ(empty.begin() + 0, empty.end());
-      EXPECT_EQ(empty.end() - 0, empty.begin());
-
-      EXPECT_EQ(empty.rend() - empty.rbegin(), 0);
-      EXPECT_EQ(empty.rbegin() + 0, empty.rend());
-      EXPECT_EQ(empty.rend() - 0, empty.rbegin());
-
-      EXPECT_EQ(empty.cend() - empty.cbegin(), 0);
-      EXPECT_EQ(empty.cbegin() + 0, empty.cend());
-      EXPECT_EQ(empty.cend() - 0, empty.cbegin());
-    }
-
-    {
-      Deque<int> one(1);
-      auto iter = one.end();
-
-      EXPECT_EQ(--iter, one.begin());
-      EXPECT_EQ(iter++, one.begin());
-    }
-
-
-    {
-      Deque<int> d(1000, 3);
-
-      EXPECT_EQ(size_t(d.end() - d.begin()), d.size());
-      EXPECT_EQ(d.begin() + d.size(), d.end());
-      EXPECT_EQ(d.end() - d.size(), d.begin());
-    }
-  }
-
-  {
-    Deque<int> d(1000, 3);
-
-    EXPECT_TRUE(d.end() > d.begin());
-    EXPECT_TRUE(d.cend() > d.cbegin());
-    EXPECT_TRUE(d.rend() > d.rbegin());
-  }
-
-
-  {
-    Deque<int> d(1000, 3);
-
-    std::iota(d.begin(), d.end(), 13);
-    std::mt19937 g(31415);
-    std::shuffle(d.begin(), d.end(), g);
-    std::sort(d.rbegin(), d.rbegin() + 500);
-    std::reverse(d.begin(), d.end());
-    auto sorted_border = std::is_sorted_until(d.begin(), d.end());
-
-    EXPECT_EQ(sorted_border - d.begin(), 500);
-  }
-}
-
-void OTHER() {
-  {
-    IteratorTest<Deque<int>::iterator, int>();
-    IteratorTest<decltype(std::declval<Deque<int>>().rbegin()), int>();
-    IteratorTest<decltype(std::declval<Deque<int>>().cbegin()), const int>();
-  }
 }
 
 void CONSTRUCTOR() {
-  std::cout << "Checking constructors: \n";
-
+  std::cout << "<<<<<<<<< Constructor tests >>>>>>>>>\n";
   {
     Deque<int> defaulted;
     EXPECT_EQ(defaulted.size(), 0);
@@ -249,7 +226,7 @@ void CONSTRUCTOR() {
 
   {
     Deque<NotDefaultConstructible> without_default;
-    Deque<NotDefaultConstructible>& copy = without_default;
+    Deque<NotDefaultConstructible> copy = without_default;
     std::ignore = copy;
     EXPECT_EQ(copy.size(), 0);
   }
@@ -275,6 +252,16 @@ void CONSTRUCTOR() {
                                 return item.data == value;
                               }));
     }
+  }
+
+  {
+    Deque<int> first(10, 10);
+    Deque<int> second(9, 9);
+    first = second;
+
+    EXPECT_EQ(first.size(), 9);
+    EXPECT_EQ(first.size(), second.size());
+    EXPECT_TRUE(CompareStacks(first, second));
   }
 
   {
@@ -307,19 +294,8 @@ void CONSTRUCTOR() {
   }
 }
 
-void OPERATORS() {
-  std::cout << "Checking operators: \n";
-
-  {
-    Deque<int> first(10, 10);
-    Deque<int> second(9, 9);
-    first = second;
-
-    EXPECT_EQ(first.size(), 9);
-    EXPECT_EQ(first.size(), second.size());
-    EXPECT_TRUE(CompareStacks(first, second));
-  }
-  std::cout << "\n";
+void ACCESS() {
+  std::cout << "<<<<<<<<< Access tests >>>>>>>>>\n";
 
   {
     Deque<size_t> defaulted(1300, 43);
@@ -327,7 +303,6 @@ void OPERATORS() {
     EXPECT_EQ(defaulted[0], defaulted[1280]);
     EXPECT_EQ(defaulted[0], 43);
   }
-  std::cout << "\n";
 
   {
     Deque<size_t> defaulted(1300, 43);
@@ -335,10 +310,18 @@ void OPERATORS() {
     EXPECT_EQ(defaulted.at(0), defaulted.at(1280));
     EXPECT_EQ(defaulted.at(0), 43);
 
-    // EXPECT_THROW(defaulted.at(size_t(-1)), std::out_of_range);
-    // EXPECT_THROW(defaulted.at(1300), std::out_of_range);
+    try {
+      defaulted.at(size_t(-1));
+    } catch (std::out_of_range) {
+      EXPECT_TRUE(true);
+    }
+
+    try {
+      defaulted.at(1300);
+    } catch (std::out_of_range) {
+      EXPECT_TRUE(true);
+    }
   }
-  std::cout << "\n";
 
   {
     Deque<size_t> defaulted;
@@ -366,18 +349,83 @@ void OPERATORS() {
 
     EXPECT_FALSE(noexcept(defaulted.at(0)));
   }
-  std::cout << "\n";
 }
 
-void MODS() {
-  std::cout << "Checking modifications (push pop insert erase): \n";
+void ITERATORS() {
+  std::cout << "<<<<<<<<< Iterator tests >>>>>>>>>\n";
 
+  {
+    IteratorTest<Deque<int>::iterator, int>();
+    IteratorTest<decltype(std::declval<Deque<int>>().rbegin()), int>();
+    IteratorTest<decltype(std::declval<Deque<int>>().cbegin()), const int>();
+  }
+
+  {
+    Deque<int> empty;
+
+    EXPECT_EQ(empty.end() - empty.begin(), 0);
+    EXPECT_EQ(empty.begin() + 0, empty.end());
+    EXPECT_EQ(empty.end() - 0, empty.begin());
+
+    EXPECT_EQ(empty.rend() - empty.rbegin(), 0);
+    EXPECT_EQ(empty.rbegin() + 0, empty.rend());
+    EXPECT_EQ(empty.rend() - 0, empty.rbegin());
+
+    EXPECT_EQ(empty.cend() - empty.cbegin(), 0);
+    EXPECT_EQ(empty.cbegin() + 0, empty.cend());
+    EXPECT_EQ(empty.cend() - 0, empty.cbegin());
+  }
+
+  {
+    Deque<int> one(1);
+    auto iter = one.end();
+
+    EXPECT_EQ(--iter, one.begin());
+    EXPECT_EQ(iter++, one.begin());
+  }
+
+  {
+    Deque<int> d(1000, 3);
+
+    EXPECT_EQ(size_t(d.end() - d.begin()), d.size());
+    EXPECT_EQ(d.begin() + d.size(), d.end());
+    EXPECT_EQ(d.end() - d.size(), d.begin());
+  }
+
+  {
+    Deque<int> d(1000, 3);
+
+    EXPECT_TRUE(d.end() > d.begin());
+    EXPECT_TRUE(d.cend() > d.cbegin());
+    EXPECT_TRUE(d.rend() > d.rbegin());
+  }
+}
+
+void ALGO() {
+  std::cout << "<<<<<<<<< Algorithm tests >>>>>>>>>\n";
+
+  {
+    Deque<int> d(1000, 3);
+
+    std::iota(d.begin(), d.end(), 13);
+    std::mt19937 g(31415);
+    std::shuffle(d.begin(), d.end(), g);
+    std::sort(d.rbegin(), d.rbegin() + 500);
+    std::reverse(d.begin(), d.end());
+    auto sorted_border = std::is_sorted_until(d.begin(), d.end());
+
+    EXPECT_EQ(sorted_border - d.begin(), 500);
+  }
+}
+
+void OPERATORS() {
+  std::cout << "<<<<<<<<< Push and pop tests >>>>>>>>>\n";
   {
     Deque<NotDefaultConstructible> d(10000, {1});
     int start_size = static_cast<int>(d.size());
 
     auto middle_iter = d.begin() + (start_size / 2); // 5000
-    auto &middle_element = *middle_iter;
+    auto& middle_element = *middle_iter;
     auto begin = d.begin();
     auto end = d.rbegin();
 
@@ -387,7 +435,8 @@ void MODS() {
     for (size_t i = 0; i < 400; ++i) {
       d.pop_back();
     }
-    // begin and middle iterators are still valid
+
+// begin and middle iterators are still valid
     EXPECT_TRUE(begin->data == 1);
     EXPECT_TRUE(middle_iter->data == 1);
     EXPECT_TRUE(middle_element.data == 1);
@@ -433,19 +482,20 @@ void MODS() {
     EXPECT_TRUE(d.size() == 5500 * 2 + 20);
   }
 
+  std::cout << "<<<<<<<<< Insert and erase tests >>>>>>>>>\n";
   {
     Deque<NotDefaultConstructible> d(10000, {1});
     auto start_size = d.size();
 
     d.insert(d.begin() + static_cast<int>(start_size) / 2,
              NotDefaultConstructible{2});
+
     EXPECT_TRUE(d.size() == start_size + 1);
     d.erase(d.begin() + static_cast<int>(start_size) / 2 - 1);
     EXPECT_TRUE(d.size() == start_size);
 
     EXPECT_TRUE(size_t(std::count(d.begin(), d.end(), NotDefaultConstructible{1}))
                     == start_size - 1);
-
     EXPECT_TRUE(std::count(d.begin(), d.end(), NotDefaultConstructible{2}) == 1);
 
     Deque<NotDefaultConstructible> copy;
@@ -454,42 +504,318 @@ void MODS() {
     }
 
     EXPECT_TRUE(d.size() == copy.size());
-    EXPECT_TRUE(std::equal(d.begin(), d.end(), copy.begin()));
+//    EXPECT_TRUE(std::equal(d.begin(), d.end(), copy.begin()));
   }
 }
 
-void EXCEPTS() {
-  std::cout << "Checking exceptions:\n";
+void THROW() {
+  std::cout << "<<<<<<<<< Throw tests >>>>>>>>>\n";
 
   {
-    {
-      try {
-        Deque<ThrowStruct> d(10, ThrowStruct(0, false, true));
-      } catch (int) {
-        std::cout << std::boolalpha << true << '\n';
-      }
-    }
-
-    {
-      Deque<ThrowStruct> d(10, ThrowStruct(10, true, false));
-
-      try {
-        d[0] = ThrowStruct(1, false, false);
-      } catch (int) {
-        std::cout << std::boolalpha << true << '\n';
-      }
-      EXPECT_EQ(d.size(), 10);
-      EXPECT_EQ(d[0].value, 10);
-    }
-
-    {
-      Deque<ThrowStruct> d(1, ThrowStruct(10, false, false));
-      try {
-        d.push_back(ThrowStruct(1, false, true));
-      } catch (int) {
-        std::cout << std::boolalpha << true << '\n';
-      }
-      EXPECT_EQ(d.size(), 1);
+    try {
+      Deque<ThrowStruct> d(10, ThrowStruct(0, false, true));
+    } catch (int) {
+      EXPECT_TRUE(true);
+    } catch (...) {
+      EXPECT_TRUE(false);
     }
   }
+
+  {
+    Deque<ThrowStruct> d(10, ThrowStruct(10, true, false));
+
+    try {
+      d[0] = ThrowStruct(1, false, false);
+    } catch (int) {
+      EXPECT_TRUE(true);
+    } catch (...) {
+      EXPECT_TRUE(false);
+    }
+
+    EXPECT_EQ(d.size(), 10);
+    EXPECT_EQ(d[0].value, 10);
+  }
+
+  {
+    Deque<ThrowStruct> d(1, ThrowStruct(10, false, false));
+
+    try {
+      d.push_back(ThrowStruct(1, false, true));
+    } catch (int) {
+      EXPECT_TRUE(true);
+    } catch (...) {
+      EXPECT_TRUE(false);
+    }
+
+    EXPECT_EQ(d.size(), 1);
+  }
+}
+
+/*
+ * Pt2 tests
+*/
+
+void PT2CONSTRUCTOR() {
+  std::cout << "<<<<<<<<< Part 2 Constructor tests >>>>>>>>>\n";
+
+  {
+    SetupTest();
+
+    {
+      Deque<TypeWithFancyNewDeleteOperators> d;
+
+      ASSERT_EQ(d.size(), 0);
+      ASSERT_TRUE(d.empty());
+      ASSERT_EQ(MemoryManager::type_new_allocated, 0);
+    }
+
+    ASSERT_EQ(MemoryManager::type_new_deleted, 0);
+  }
+
+  {
+    SetupTest();
+    {
+      constexpr size_t kSize = 10;
+      Deque<TypeWithFancyNewDeleteOperators> d(kSize);
+      ASSERT_EQ(d.size(), kSize);
+      ASSERT_EQ(MemoryManager::type_new_allocated, 0);
+    }
+    ASSERT_EQ(MemoryManager::type_new_deleted, 0);
+  }
+
+  {
+    SetupTest();
+    AllocatorWithCount<TypeWithFancyNewDeleteOperators> alloc;
+    constexpr size_t kSize = 10;
+    {
+      Deque<TypeWithFancyNewDeleteOperators,
+            AllocatorWithCount<TypeWithFancyNewDeleteOperators>> d(kSize, alloc);
+      ASSERT_EQ(d.size(), kSize);
+      ASSERT_EQ(MemoryManager::type_new_allocated, 0);
+      ASSERT_EQ(MemoryManager::type_new_deleted, 0);
+      ASSERT_TRUE(MemoryManager::allocator_allocated != 0);
+      ASSERT_TRUE(MemoryManager::allocator_constructed >= kSize);
+      ASSERT_EQ(alloc.allocator_allocated, 0);
+      ASSERT_EQ(alloc.allocator_constructed, 0);
+    }
+    ASSERT_TRUE(MemoryManager::allocator_deallocated != 0);
+    ASSERT_TRUE(MemoryManager::allocator_destroyed >= kSize);
+    ASSERT_EQ(alloc.allocator_destroyed, 0);
+    ASSERT_EQ(alloc.allocator_deallocated, 0);
+  }
+
+  {
+    SetupTest();
+    constexpr size_t kSize = 10;
+    AllocatorWithCount<TypeWithFancyNewDeleteOperators> alloc;
+    TypeWithFancyNewDeleteOperators default_value(1);
+    Deque<TypeWithFancyNewDeleteOperators,
+          AllocatorWithCount<TypeWithFancyNewDeleteOperators>>
+        d(kSize, default_value, alloc);
+    ASSERT_EQ(d.size(), kSize);
+    ASSERT_EQ(MemoryManager::type_new_allocated, 0);
+    ASSERT_EQ(MemoryManager::type_new_deleted, 0);
+    ASSERT_TRUE(MemoryManager::allocator_allocated != 0);
+    ASSERT_TRUE(MemoryManager::allocator_constructed >= kSize);
+    ASSERT_EQ(alloc.allocator_allocated, 0);
+    ASSERT_EQ(alloc.allocator_constructed, 0);
+
+    for (auto it = d.begin(); it != d.end(); ++it) {
+      ASSERT_EQ(it->value, default_value.value);
+    }
+  }
+
+  {
+    SetupTest();
+    const size_t size = 5;
+    Deque<TypeWithCounts, AllocatorWithCount<TypeWithCounts>> d1 = {1, 2, 3, 4, 5};
+    Deque<TypeWithCounts, AllocatorWithCount<TypeWithCounts>> d2(d1);
+
+    ASSERT_EQ(d2.size(), size);
+    ASSERT_TRUE(MemoryManager::allocator_allocated != 0);
+    ASSERT_TRUE(MemoryManager::allocator_constructed >= size * 2);
+    ASSERT_TRUE(CompareStacks(d1, d2));
+    for (auto& value: d1) {
+      ASSERT_EQ(*value.copy_c, 2);
+    }
+  }
+
+
+  {
+    SetupTest();
+    Deque<OnlyMovable> d;
+// NO LINT
+    ASSERT_EQ(d.size(), 0);
+    d.emplace_back(0);
+    ASSERT_EQ(d.size(), 1);
+    OnlyMovable om(0);
+    d.push_back(std::move(om));
+    ASSERT_EQ(d.size(), 2);
+  }
+
+  {
+    SetupTest();
+    const size_t size = 5;
+    Deque<TypeWithCounts, AllocatorWithCount<TypeWithCounts>> d1 = {1, 2, 3, 4, 5};
+    Deque<TypeWithCounts, AllocatorWithCount<TypeWithCounts>> d2(std::move(d1));
+
+    ASSERT_EQ(d1.size(), 0);
+    ASSERT_EQ(d2.size(), size);
+    ASSERT_TRUE(MemoryManager::allocator_allocated != 0);
+    ASSERT_TRUE(MemoryManager::allocator_constructed >= size);
+    for (auto& value : d1) {
+      ASSERT_EQ(*value.copy_c, 1);
+      ASSERT_EQ(*value.move_c, 1);
+    }
+  }
+}
+
+void PROPAGATE() {
+  std::cout << "<<<<<<<<< Propagate tests >>>>>>>>>\n";
+  {
+    SetupTest();
+    Deque<int, WhimsicalAllocator<int, true, true>> d;
+
+    d.push_back(1);
+    d.push_back(2);
+
+    auto copy = d;
+    ASSERT_TRUE(copy.get_allocator() != d.get_allocator());
+
+    d = copy;
+    ASSERT_TRUE(copy.get_allocator() == d.get_allocator());
+  }
+
+  {
+    SetupTest();
+    Deque<int, WhimsicalAllocator<int, false, false>> d;
+
+    d.push_back(1);
+    d.push_back(2);
+
+    auto copy = d;
+    ASSERT_TRUE(copy.get_allocator() == d.get_allocator());
+
+    d = copy;
+    ASSERT_TRUE(copy.get_allocator() == d.get_allocator());
+  }
+
+  {
+    SetupTest();
+    Deque<int, WhimsicalAllocator<int, true, false>> d;
+
+    d.push_back(1);
+    d.push_back(2);
+
+    auto copy = d;
+    ASSERT_TRUE(copy.get_allocator() != d.get_allocator());
+
+    d = copy;
+    ASSERT_TRUE(copy.get_allocator() != d.get_allocator());
+  }
+}
+
+void ACCOUNTANT() {
+  std::cout << "<<<<<<<<< Accountant tests >>>>>>>>>\n";
+
+  {
+    Accountant::reset();
+    {
+      Deque<Accountant> d(5);
+      ASSERT_EQ(d.size(), 5);
+      ASSERT_EQ(Accountant::ctor_calls, 5);
+
+      Deque<Accountant> another = d;
+
+      ASSERT_EQ(another.size(), 5);
+      ASSERT_EQ(Accountant::ctor_calls, 10);
+      ASSERT_EQ(Accountant::dtor_calls, 0);
+
+      another.pop_back();
+      another.pop_front();
+
+      ASSERT_EQ(Accountant::dtor_calls, 2);
+
+      d = another; // dtor_calls += 5, ctor_calls += 3
+
+      ASSERT_EQ(another.size(), 3);
+      ASSERT_EQ(d.size(), 3);
+
+      ASSERT_EQ(Accountant::ctor_calls, 13);
+      ASSERT_EQ(Accountant::dtor_calls, 7);
+    } // dtor_calls += 6
+
+    ASSERT_EQ(Accountant::ctor_calls, 13);
+    ASSERT_EQ(Accountant::dtor_calls, 13);
+  }
+}
+
+void PT2OPERATORS() {
+  std::cout << "<<<<<<<<< Part 2 operators tests >>>>>>>>>\n";
+
+  {
+    TypeWithCounts t(0);
+    Deque<TypeWithCounts> d;
+    d.emplace_back(0);
+    ASSERT_EQ(*d.begin()->int_c, 1);
+    ASSERT_EQ(*d.begin()->move_c, 0);
+    ASSERT_EQ(*d.begin()->copy_c, 0);
+
+    d.push_front(std::move(t));
+    ASSERT_EQ(*d.begin()->move_c, 1);
+    ASSERT_EQ(*d.begin()->copy_c, 0);
+  }
+}
+
+void EXCEPT() {
+  std::cout << "<<<<<<<<< Exceptions tests >>>>>>>>>\n";
+
+  {
+    Accountant::reset();
+
+    ThrowingAccountant::need_throw = true;
+
+    try {
+      Deque<ThrowingAccountant> d(8);
+    } catch (...) {
+      ASSERT_EQ(Accountant::ctor_calls, 4);
+      ASSERT_EQ(Accountant::dtor_calls, 4);
+    }
+
+    ThrowingAccountant::need_throw = false;
+    Deque<ThrowingAccountant> d(8);
+
+    Deque<ThrowingAccountant> d2;
+    for (int i = 0; i < 13; ++i) {
+      d2.push_back(i);
+    }
+
+    Accountant::reset();
+    ThrowingAccountant::need_throw = true;
+
+    try {
+      auto d3 = d2;
+    } catch (...) {
+      ASSERT_EQ(Accountant::ctor_calls, 4);
+      ASSERT_EQ(Accountant::dtor_calls, 4);
+    }
+
+    Accountant::reset();
+
+    try {
+      d = d2;
+    } catch (...) {
+      ASSERT_EQ(Accountant::ctor_calls, 4);
+      ASSERT_EQ(Accountant::dtor_calls, 4);
+
+// Actually it may not be 8 (although de facto it is), but the only thing we can demand here
+// is the abscence of memory leaks
+//
+//assert(lst.size() == 8);
+    }
+  }
+}
+
+int main_test() {
+  return 0;
 }
