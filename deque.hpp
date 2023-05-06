@@ -400,20 +400,6 @@ class Deque {
 
   Alloc get_allocator() { return alloc_; }
 
-  void print() {
-    for (size_t i = 0; i < outer_.size(); ++i) {
-      if (outer_[i] == nullptr) {
-        std::cout << i << " -> NULL\n";
-      } else {
-        std::cout << i << " -> " << outer_[i] << '\n';
-      }
-    }
-    std::cout << "\n\nAbove: " << num_of_arrays_above_
-              << "\nBeyond: " << num_of_arrays_beyond_ << '\n';
-    std::cout << "\n\nBegin: " << *begin_vector_ << " : " << begin_pos_ << '\n';
-    std::cout << "End: " << *end_vector_ << " : " << end_pos_ << "\n\n";
-  }
-
   void resize_if_needed() {
     size_t cur_size = outer_.size();
 
@@ -507,7 +493,8 @@ class Deque {
       end_pos_ = kInnerArraySize - 1;
       end_vector_--;
       num_of_arrays_beyond_++;
-      alloc_traits::deallocate(alloc_, *end_vector_, kInnerArraySize);
+      alloc_traits::deallocate(alloc_, *(end_vector_ + 1), kInnerArraySize);
+      *(end_vector_ + 1) = nullptr;
     } else {
       alloc_traits::destroy(alloc_, *end_vector_ + end_pos_ - 1);
       end_pos_--;
@@ -527,8 +514,9 @@ class Deque {
     if (begin_pos_ == kInnerArraySize) {
       begin_pos_ = 0;
       begin_vector_++;
-      alloc_traits::deallocate(alloc_, *begin_vector_, kInnerArraySize);
       num_of_arrays_above_++;
+      alloc_traits::deallocate(alloc_, *(begin_vector_ - 1), kInnerArraySize);
+      *(begin_vector_ - 1) = nullptr;
     }
 
     actual_size_--;
