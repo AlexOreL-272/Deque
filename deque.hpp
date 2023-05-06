@@ -72,13 +72,15 @@ class Deque {
     end_pos_ = 0;
   }
 
-  explicit Deque(const size_t& count, const Alloc& alloc = Alloc()) : actual_size_(count), alloc_(alloc) {
+  explicit Deque(const size_t& count, const Alloc& alloc = Alloc())
+      : actual_size_(count), alloc_(alloc) {
     size_t num_of_arrays;
     size_t delete_to_vec;
     size_t delete_to_pos = 0;
 
     try {
-      auto uses_whole_number = static_cast<size_t>(count % kInnerArraySize == 0);
+      auto uses_whole_number =
+          static_cast<size_t>(count % kInnerArraySize == 0);
 
       num_of_arrays = count / kInnerArraySize + 1 - uses_whole_number;
       delete_to_vec = num_of_arrays - 1;
@@ -88,7 +90,8 @@ class Deque {
       num_of_arrays_beyond_ = num_of_arrays;
 
       for (size_t i = num_of_arrays;
-           i < 2 * num_of_arrays - 1 + uses_whole_number; ++i, ++delete_to_vec) {
+           i < 2 * num_of_arrays - 1 + uses_whole_number;
+           ++i, ++delete_to_vec) {
         outer_[i] = alloc_traits::allocate(alloc_, kInnerArraySize);
 
         for (size_t j = 0; j < kInnerArraySize; ++j, ++delete_to_pos) {
@@ -97,7 +100,8 @@ class Deque {
         delete_to_pos = 0;
       }
 
-      outer_[2 * num_of_arrays - 1 + uses_whole_number] = alloc_traits::allocate(alloc_, kInnerArraySize);
+      outer_[2 * num_of_arrays - 1 + uses_whole_number] =
+          alloc_traits::allocate(alloc_, kInnerArraySize);
 
       end_vector_ = &outer_[2 * num_of_arrays - 1 + uses_whole_number];
       end_pos_ = count % kInnerArraySize;
@@ -110,18 +114,21 @@ class Deque {
         alloc_traits::construct(alloc_, *end_vector_ + i);
       }
     } catch (...) {
-      full_destroy(&outer_[num_of_arrays], 0, &outer_[delete_to_vec], delete_to_pos);
+      full_destroy(&outer_[num_of_arrays], 0, &outer_[delete_to_vec],
+                   delete_to_pos);
       throw -1;  // std::runtime_error("Could not constuct an object\n");
     }
   }
 
-  Deque(const size_t& count, const T& value, const Alloc& alloc = Alloc()) : actual_size_(count), alloc_(alloc) {
+  Deque(const size_t& count, const T& value, const Alloc& alloc = Alloc())
+      : actual_size_(count), alloc_(alloc) {
     size_t num_of_arrays;
     size_t delete_to_vec;
     size_t delete_to_pos = 0;
 
     try {
-      auto uses_whole_number = static_cast<size_t>(count % kInnerArraySize == 0);
+      auto uses_whole_number =
+          static_cast<size_t>(count % kInnerArraySize == 0);
 
       num_of_arrays = count / kInnerArraySize + 1 - uses_whole_number;
       delete_to_vec = num_of_arrays - 1;
@@ -131,7 +138,8 @@ class Deque {
       num_of_arrays_beyond_ = num_of_arrays;
 
       for (size_t i = num_of_arrays;
-           i < 2 * num_of_arrays - 1 + uses_whole_number; ++i, ++delete_to_vec) {
+           i < 2 * num_of_arrays - 1 + uses_whole_number;
+           ++i, ++delete_to_vec) {
         outer_[i] = alloc_traits::allocate(alloc_, kInnerArraySize);
 
         for (size_t j = 0; j < kInnerArraySize; ++j, ++delete_to_pos) {
@@ -140,7 +148,8 @@ class Deque {
         delete_to_pos = 0;
       }
 
-      outer_[2 * num_of_arrays - 1 + uses_whole_number] = alloc_traits::allocate(alloc_, kInnerArraySize);
+      outer_[2 * num_of_arrays - 1 + uses_whole_number] =
+          alloc_traits::allocate(alloc_, kInnerArraySize);
       end_vector_ = &outer_[2 * num_of_arrays - 1 + uses_whole_number];
       end_pos_ = count % kInnerArraySize;
 
@@ -152,7 +161,8 @@ class Deque {
         alloc_traits::construct(alloc_, *end_vector_ + i, value);
       }
     } catch (...) {
-      full_destroy(&outer_[num_of_arrays], 0, &outer_[delete_to_vec], delete_to_pos);
+      full_destroy(&outer_[num_of_arrays], 0, &outer_[delete_to_vec],
+                   delete_to_pos);
       throw -1;  // std::runtime_error("Could not constuct an object\n");
     }
   }
@@ -173,7 +183,8 @@ class Deque {
 
     try {
       size = other.outer_.size();
-      auto uses_whole_number = static_cast<size_t>(other.size() % kInnerArraySize == 0);
+      auto uses_whole_number =
+          static_cast<size_t>(other.size() % kInnerArraySize == 0);
       outer_.resize(size, nullptr);
 
       num_of_arrays_above_ = other.num_of_arrays_above_;
@@ -181,9 +192,12 @@ class Deque {
       actual_size_ = other.actual_size_;
       delete_to_vec = num_of_arrays_above_ - 1;
 
-      for (size_t i = num_of_arrays_above_; i < size - num_of_arrays_beyond_ - 1 + uses_whole_number; ++i, ++delete_to_vec) {
+      for (size_t i = num_of_arrays_above_;
+           i < size - num_of_arrays_beyond_ - 1 + uses_whole_number;
+           ++i, ++delete_to_vec) {
         outer_[i] = alloc_traits::allocate(alloc_, kInnerArraySize);
-        for (size_t j = i == num_of_arrays_above_ ? other.begin_pos_ : 0; j < kInnerArraySize; ++j, ++delete_to_pos) {
+        for (size_t j = i == num_of_arrays_above_ ? other.begin_pos_ : 0;
+             j < kInnerArraySize; ++j, ++delete_to_pos) {
           alloc_traits::construct(alloc_, outer_[i] + j, other.outer_[i][j]);
         }
         delete_to_pos = 0;
@@ -193,8 +207,10 @@ class Deque {
       begin_pos_ = other.begin_pos_;
 
       if (num_of_arrays_beyond_ + 1 - uses_whole_number != 0) {
-        outer_[size - num_of_arrays_beyond_ - 1 + uses_whole_number] = alloc_traits::allocate(alloc_, kInnerArraySize);
-        end_vector_ = &outer_[size - num_of_arrays_beyond_ - 1 + uses_whole_number];
+        outer_[size - num_of_arrays_beyond_ - 1 + uses_whole_number] =
+            alloc_traits::allocate(alloc_, kInnerArraySize);
+        end_vector_ =
+            &outer_[size - num_of_arrays_beyond_ - 1 + uses_whole_number];
       } else {
         end_vector_ = &outer_[size - 1] + 1;
       }
@@ -203,12 +219,15 @@ class Deque {
 
       if (*other.end_vector_ != nullptr) {
         ++delete_to_vec;
-        for (size_t i = begin_vector_ == end_vector_ ? begin_pos_ : 0; i < end_pos_; ++i, ++delete_to_pos) {
-          alloc_traits::construct(alloc_, *end_vector_ + i, (*other.end_vector_)[i]);
+        for (size_t i = begin_vector_ == end_vector_ ? begin_pos_ : 0;
+             i < end_pos_; ++i, ++delete_to_pos) {
+          alloc_traits::construct(alloc_, *end_vector_ + i,
+                                  (*other.end_vector_)[i]);
         }
       }
     } catch (...) {
-      full_destroy(&outer_[num_of_arrays_above_], 0, &outer_[delete_to_vec], delete_to_pos);
+      full_destroy(&outer_[num_of_arrays_above_], 0, &outer_[delete_to_vec],
+                   delete_to_pos);
       throw -1;  // std::runtime_error("Could not copy-constuct an object\n");
     }
   }
@@ -228,7 +247,8 @@ class Deque {
     std::swap(end_pos_, other.end_pos_);
   }
 
-  Deque(std::initializer_list<T> init, const Alloc& alloc = Alloc()) : actual_size_(init.size()) {
+  Deque(std::initializer_list<T> init, const Alloc& alloc = Alloc())
+      : actual_size_(init.size()) {
     size_t num_of_arrays;
     size_t delete_to_vec;
     size_t delete_to_pos = 0;
@@ -236,8 +256,7 @@ class Deque {
 
     try {
       auto init_beg = init.begin();
-      auto uses_whole_number =
-          static_cast<size_t>(size % kInnerArraySize == 0);
+      auto uses_whole_number = static_cast<size_t>(size % kInnerArraySize == 0);
 
       num_of_arrays = size / kInnerArraySize + uses_whole_number + 1;
       delete_to_vec = num_of_arrays;
@@ -247,7 +266,8 @@ class Deque {
       num_of_arrays_beyond_ = num_of_arrays;
 
       for (size_t i = num_of_arrays;
-           i < 2 * num_of_arrays - 1 - uses_whole_number; ++i, ++delete_to_vec) {
+           i < 2 * num_of_arrays - 1 - uses_whole_number;
+           ++i, ++delete_to_vec) {
         outer_[i] = alloc_traits::allocate(alloc_, kInnerArraySize);
 
         for (size_t j = 0; j < kInnerArraySize; ++j, ++delete_to_pos) {
@@ -256,7 +276,8 @@ class Deque {
         delete_to_pos = 0;
       }
 
-      outer_[2 * num_of_arrays - 1 - uses_whole_number] = alloc_traits::allocate(alloc_, kInnerArraySize);
+      outer_[2 * num_of_arrays - 1 - uses_whole_number] =
+          alloc_traits::allocate(alloc_, kInnerArraySize);
 
       end_vector_ = &outer_[2 * num_of_arrays - 1 - uses_whole_number];
       end_pos_ = size % kInnerArraySize;
@@ -269,14 +290,13 @@ class Deque {
         alloc_traits::construct(alloc_, *end_vector_ + i, *init_beg++);
       }
     } catch (...) {
-      full_destroy(&outer_[num_of_arrays], 0, &outer_[delete_to_vec], delete_to_pos);
+      full_destroy(&outer_[num_of_arrays], 0, &outer_[delete_to_vec],
+                   delete_to_pos);
       throw -1;  // std::runtime_error("Could not constuct an object\n");
     }
   }
 
-  ~Deque() {
-    full_destroy(begin_vector_, begin_pos_, end_vector_, end_pos_);
-  }
+  ~Deque() { full_destroy(begin_vector_, begin_pos_, end_vector_, end_pos_); }
 
   Deque& operator=(const Deque& obj_to_assign) {
     Deque copy(obj_to_assign);  // but it might throw an exception there...
@@ -314,7 +334,8 @@ class Deque {
       std::swap(end_vector_, other.end_vector_);
       std::swap(end_pos_, other.end_pos_);
 
-      other.full_destroy(other.begin_vector_, other.begin_pos_, other.end_vector_, other.end_pos_);
+      other.full_destroy(other.begin_vector_, other.begin_pos_,
+                         other.end_vector_, other.end_pos_);
     }
 
     return *this;
@@ -382,17 +403,29 @@ class Deque {
 
   Alloc get_allocator() { return alloc_; }
 
+  void print() {
+    for (size_t i = 0; i < outer_.size(); ++i) {
+      if (outer_[i] == nullptr) {
+        std::cout << i << " -> NULL\n";
+      } else {
+        std::cout << i << " -> " << outer_[i] << '\n';
+      }
+    }
+    std::cout << "\n\nAbove: " << num_of_arrays_above_
+              << "\nBeyond: " << num_of_arrays_beyond_ << '\n';
+    std::cout << "\n\nBegin: " << *begin_vector_ << " : " << begin_pos_ << '\n';
+    std::cout << "End: " << *end_vector_ << " : " << end_pos_ << "\n\n";
+  }
+
   void resize_if_needed() {
     size_t cur_size = outer_.size();
-
-    if (*end_vector_ == nullptr) {
-      *end_vector_ = alloc_traits::allocate(alloc_, kInnerArraySize);
-    }
 
     if (!(end_vector_ > &outer_[cur_size - 1] && end_pos_ == 0) &&
         !(begin_vector_ < (outer_).data() && begin_pos_ == 0)) {
       return;
     }
+
+    // print();
 
     std::vector<T*> new_vec(cur_size * 3, nullptr);
     for (size_t i = cur_size - 1; i < 2 * cur_size - 1; ++i) {
@@ -408,10 +441,17 @@ class Deque {
 
     begin_vector_ = &outer_[cur_size - 1] + (begin_vector_ - addr);
     end_vector_ = &outer_[cur_size - 1] + (end_vector_ - addr);
+
+    // print();
   }
 
   void push_back(const T& elem) {
     resize_if_needed();
+
+    if (nullptr == *end_vector_) {
+      *end_vector_ = alloc_traits::allocate(alloc_, kInnerArraySize);
+      return;
+    }
 
     try {
       alloc_traits::construct(alloc_, *end_vector_ + end_pos_, elem);
@@ -427,7 +467,11 @@ class Deque {
       end_vector_++;
     }
     if (end_pos_ == 1) {
-      num_of_arrays_beyond_--;
+      if (num_of_arrays_beyond_ == 0) {
+        std::cout << "<<<<<<<<<<<< Some kind of error: >>>>>>>>>>>>\n";
+      } else {
+        num_of_arrays_beyond_--;
+      }
     }
 
     resize_if_needed();
@@ -499,8 +543,9 @@ class Deque {
   void push_back(T&& elem) {
     resize_if_needed();
 
-    if (*end_vector_ == nullptr) {
+    if (nullptr == *end_vector_) {
       *end_vector_ = alloc_traits::allocate(alloc_, kInnerArraySize);
+      return;
     }
 
     try {
@@ -541,7 +586,8 @@ class Deque {
 
     try {
       begin_pos_--;
-      alloc_traits::construct(alloc_, *begin_vector_ + begin_pos_, std::move(elem));
+      alloc_traits::construct(alloc_, *begin_vector_ + begin_pos_,
+                              std::move(elem));
     } catch (...) {
       begin_pos_ = copy_pos;
       begin_vector_ = copy_begin;
@@ -560,7 +606,8 @@ class Deque {
     }
 
     try {
-      alloc_traits::construct(alloc_, *end_vector_ + end_pos_, std::forward<Args>(elems)...);
+      alloc_traits::construct(alloc_, *end_vector_ + end_pos_,
+                              std::forward<Args>(elems)...);
     } catch (...) {
       throw -2;  // std::runtime_error("Could not push back this value\n");
     }
@@ -596,7 +643,8 @@ class Deque {
 
     try {
       begin_pos_--;
-      alloc_traits::construct(alloc_, *begin_vector_ + begin_pos_, std::forward<Args>(elems)...);
+      alloc_traits::construct(alloc_, *begin_vector_ + begin_pos_,
+                              std::forward<Args>(elems)...);
     } catch (...) {
       begin_pos_ = copy_pos;
       begin_vector_ = copy_begin;
@@ -665,7 +713,7 @@ class Deque {
   }
 
   void insert(iterator iter, const T& val) {
-    Deque copy(*this);
+    // Deque copy(*this);
 
     try {
       auto end_iter = end();
@@ -684,7 +732,8 @@ class Deque {
 
       push_back(tmp1);
     } catch (...) {
-      *this = copy;
+      std::cout << "---------- Error! -------------\n";
+      // *this = copy;
       throw -3;  // std::runtime_error("Could not insert a value\n");
     }
   }
@@ -884,12 +933,12 @@ class Deque<T, Alloc>::Iterator {
   short compare_to(const Iterator<ConstR, IsReversed> kOther) const {
     if (ptr_ == kOther.get_ptr()) {
       return (pos_ == kOther.get_pos()  ? 0
-                                        : pos_ < kOther.get_pos() ? -1
-                                                                  : 1) *
-          (1 - 2 * static_cast<short>(IsReversed));
+              : pos_ < kOther.get_pos() ? -1
+                                        : 1) *
+             (1 - 2 * static_cast<short>(IsReversed));
     }
     return (ptr_ < kOther.get_ptr() ? -1 : 1) *
-        (1 - 2 * static_cast<short>(IsReversed));
+           (1 - 2 * static_cast<short>(IsReversed));
   }
 
   template <bool ConstR>
@@ -925,8 +974,8 @@ class Deque<T, Alloc>::Iterator {
   template <bool ConstR>
   difference_type operator-(const Iterator<ConstR, IsReversed> kOther) const {
     return (static_cast<int>((ptr_ - kOther.ptr_) * kInnerArraySize) +
-        static_cast<int>(pos_) - static_cast<int>(kOther.pos_)) *
-        (1 - 2 * static_cast<int>(IsReversed));
+            static_cast<int>(pos_) - static_cast<int>(kOther.pos_)) *
+           (1 - 2 * static_cast<int>(IsReversed));
   }
 
   reference operator*() const {
